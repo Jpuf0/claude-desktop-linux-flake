@@ -12,11 +12,11 @@
   patchy-cnb,
 }: let
   pname = "claude-desktop";
-  version = "0.7.8";
+  version = "0.8.0";
   srcExe = fetchurl {
     # NOTE: `?v=0.7.8` doesn't actually request a specific version. It's only being used here as a cache buster.
-    url = "https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-x64/Claude-Setup-x64.exe?v=0.7.8";
-    hash = "sha256-SOO1FkAfcOP50Z4YPyrrpSIi322gQdy9vk0CKdYjMwA=";
+    url = "https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-x64/Claude-Setup-x64.exe?v=${version}";
+    hash = "sha256-nDUIeLPWp1ScyfoLjvMhG79TolnkI8hedF1FVIaPhPw=";
   };
 in
   stdenvNoCC.mkDerivation rec {
@@ -56,7 +56,7 @@ in
 
       # Extract installer exe, and nupkg within it
       7z x -y ${srcExe}
-      7z x -y "AnthropicClaude-${version}-full.nupkg"
+      7z x -y "AnthropicClaude-*-full.nupkg"
 
       # Package the icons from claude.exe
       wrestool -x -t 14 lib/net45/claude.exe -o claude.ico
@@ -84,10 +84,15 @@ in
       cp ${patchy-cnb}/lib/patchy-cnb.*.node app.asar.contents/node_modules/claude-native/claude-native-binding.node
       cp ${patchy-cnb}/lib/patchy-cnb.*.node app.asar.unpacked/node_modules/claude-native/claude-native-binding.node
 
-      # .vite/build/index.js in the app.asar expects the Tray icons to be
-      # placed inside the app.asar.
+      # Ensure i18n folder is copied
+      mkdir -p app.asar.contents/resources/i18n
+      cp ../lib/net45/resources/en-US.json app.asar.contents/resources/i18n/en-US.json
+
+      # If there are other languages, copy them as well
+      cp ../lib/net45/resources/*.json app.asar.contents/resources/i18n/ || true
+
+      # The .vite/build/index.js in the app.asar expects the Tray icons to be placed inside the app.asar.
       mkdir -p app.asar.contents/resources
-      ls ../lib/net45/resources/
       cp ../lib/net45/resources/Tray* app.asar.contents/resources/
 
       # Repackage app.asar
@@ -103,6 +108,10 @@ in
       mkdir -p $out/lib/$pname
       cp -r $TMPDIR/build/electron-app/app.asar $out/lib/$pname/
       cp -r $TMPDIR/build/electron-app/app.asar.unpacked $out/lib/$pname/
+
+      # Ensure i18n folder is included in the installation
+      mkdir -p $out/lib/$pname/resources/i18n
+      cp -r $TMPDIR/build/lib/net45/resources/*.json $out/lib/$pname/resources/i18n/ || true
 
       # Install icons
       mkdir -p $out/share/icons
